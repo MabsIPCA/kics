@@ -40,30 +40,32 @@ func (r *Resolver) Resolve(filePath string) (model.ResolvedFiles, error) {
 			masterUtils.HandlePanic(r, errMessage)
 		}
 	}()
-	splits, excluded, err := renderHelm(filePath)
+	splitRenderedManifests, excluded, err := renderHelm(filePath, true)
 	if err != nil { // return error to be logged
 		return model.ResolvedFiles{}, errors.New("failed to render helm chart")
 	}
-	var rfiles = model.ResolvedFiles{
+	var rFiles = model.ResolvedFiles{
 		Excluded: excluded,
 	}
-	for _, split := range *splits {
+	for _, split := range *splitRenderedManifests {
 		subFolder := filepath.Base(filePath)
 
-		splitPath := strings.Split(split.path, getPathSeparator(split.path))
+		splitPath := filepath.Join(
+			strings.Split(split.path, getPathSeparator(split.path))[1:]...,
+		)
 
-		splited := filepath.Join(splitPath[1:]...)
+		originalPath := filepath.Join(filepath.Dir(filePath), subFolder, splitPath)
 
-		origpath := filepath.Join(filepath.Dir(filePath), subFolder, splited)
-		rfiles.File = append(rfiles.File, model.ResolvedHelm{
-			FileName:     origpath,
+		// append resolved helm file to the list
+		rFiles.File = append(rFiles.File, model.ResolvedHelm{
+			FileName:     originalPath,
 			Content:      split.content,
 			OriginalData: split.original,
 			SplitID:      split.splitID,
 			IDInfo:       split.splitIDMap,
 		})
 	}
-	return rfiles, nil
+	return rFiles, nil
 }
 
 // SupportedTypes returns the supported fileKinds for this resolver
@@ -72,35 +74,70 @@ func (r *Resolver) SupportedTypes() []model.FileKind {
 }
 
 // renderHelm will use helm library to render helm charts
-func renderHelm(path string) (*[]splitManifest, []string, error) {
+func renderHelm(path string, experimentalRendering bool) (*[]splitManifest, []string, error) {
 	client := newClient()
 	manifest, excluded, err := runInstall([]string{path}, client, &values.Options{})
 	if err != nil {
 		return nil, []string{}, err
 	}
-	splitted, err := splitManifestYAML(manifest)
+	split, err := splitManifestYAML(manifest)
 	if err != nil {
 		return nil, []string{}, err
 	}
-	return splitted, excluded, nil
+
+	if experimentalRendering {
+		otherValuesFiles := getOtherValuesFiles(path)
+		if len(otherValuesFiles) > 0 {
+			expManifest, _, err := runInstall([]string{path}, client, &values.Options{
+				ValueFiles: otherValuesFiles,
+			})
+			if err != nil {
+				return nil, []string{}, err
+			}
+			expSplit, err := splitManifestYAML(expManifest)
+			if err != nil {
+				return nil, []string{}, err
+			}
+
+			*split = append(*split, *expSplit...)
+		}
+	}
+	return split, excluded, nil
+}
+
+func getOtherValuesFiles(path string) []string {
+	otherValuesFiles := []string{}
+
+	files, err := filepath.Glob(filepath.Join(path, "*.yaml"))
+	if err != nil {
+		return otherValuesFiles
+	}
+
+	for _, file := range files {
+		if filepath.Base(file) != "values.yaml" && filepath.Base(file) != "Chart.yaml" {
+			otherValuesFiles = append(otherValuesFiles, file)
+		}
+	}
+
+	return otherValuesFiles
 }
 
 // splitManifestYAML will split the rendered file and return its content by template as well as the template path
 func splitManifestYAML(template *release.Release) (*[]splitManifest, error) {
 	sources := make([]*chart.File, 0)
 	sources = updateName(sources, template.Chart, template.Chart.Name())
-	var splitedManifest []splitManifest
-	splitedSource := strings.Split(template.Manifest, "---") // split manifest by '---'
+	var manifests []splitManifest
+	splitTemplate := strings.Split(template.Manifest, "---") // splitTemplate manifest by '---'
 	origData := toMap(sources)
-	for _, splited := range splitedSource {
+	for _, manifest := range splitTemplate {
 		var lineID string
-		for _, line := range strings.Split(splited, "\n") {
+		for _, line := range strings.Split(manifest, "\n") {
 			if strings.Contains(line, kicsHelmID) {
 				lineID = line // get auxiliary line id
 				break
 			}
 		}
-		path := strings.Split(strings.TrimPrefix(splited, "\n# Source: "), "\n") // get source of split yaml
+		path := strings.Split(strings.TrimPrefix(manifest, "\n# Source: "), "\n") // get source of splitTemplate yaml
 		// ignore auxiliary files used to render chart
 		if path[0] == "" {
 			continue
@@ -112,15 +149,26 @@ func splitManifestYAML(template *release.Release) (*[]splitManifest, error) {
 		if err != nil {
 			return nil, err
 		}
-		splitedManifest = append(splitedManifest, splitManifest{
+		manifests = append(manifests, splitManifest{
 			path:       path[0],
-			content:    []byte(strings.ReplaceAll(splited, "\r", "")),
+			content:    []byte(strings.ReplaceAll(manifest, "\r", "")),
 			original:   origData[filepath.FromSlash(path[0])], // get original data from template
 			splitID:    lineID,
 			splitIDMap: idMap,
 		})
+
+		// TODO: perceber como consigo usar caminhos ficticios para os diferentes values files
+		// ex: chart/values-dev.yaml, chart/values-prod.yaml
+		// assim consigo distinguir os ficheiros no resultado final
+		// e depois consigo agregar os resultados por ficheiro
+
+		// Notas: como devo gerir como o KICS faz scan de todos os possiveis values?
+		// durante o scan pode dar problemas usar o mesmo contexto
+		// devia gerir is por fora do scan? criar uma nova flag para dar o nome dos values files e depois dar centralizar os resultados
+		// criar infra interna ao KICS para isolar contexto na execução dos scan de helm charts para este caso
+		
 	}
-	return &splitedManifest, nil
+	return &manifests, nil
 }
 
 // toMap will convert to map original data having the path as it's key
