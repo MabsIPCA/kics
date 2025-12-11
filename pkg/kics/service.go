@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	mbConst = 1048576
+	mbConst         = 1048576
+	defaultSelector = "no_selector"
 )
 
 // Storage is the interface that wraps following basic methods: SaveFile, SaveVulnerability, GetVulnerability and GetScanSummary
@@ -31,7 +32,7 @@ const (
 // GetScanSummary should return a list of summaries based on their scan IDs
 type Storage interface {
 	SaveFile(ctx context.Context, metadata *model.FileMetadata) error
-	SaveVulnerabilities(ctx context.Context, vulnerabilities []model.Vulnerability) error
+	SaveVulnerabilities(ctx context.Context, vulnerabilities []model.Vulnerability, contextSelector string) error
 	GetVulnerabilities(ctx context.Context, scanID string) ([]model.Vulnerability, error)
 	GetScanSummary(ctx context.Context, scanIDs []string) ([]model.SeveritySummary, error)
 }
@@ -95,35 +96,50 @@ func (s *Service) StartScan(
 	log.Debug().Msg("service.StartScan()")
 	defer wg.Done()
 
-	secretsVulnerabilities, err := s.SecretsInspector.Inspect(
-		ctx,
-		s.SourceProvider.GetBasePaths(),
-		s.files,
-		currentQuery,
-	)
-	if err != nil {
-		errCh <- errors.Wrap(err, "failed to inspect secrets")
-	}
+	segments := s.segmentationPerContextSeletor()
+	for contextSelector, segmentFiles := range segments {
+		secretsVulnerabilities, err := s.SecretsInspector.Inspect(
+			ctx,
+			s.SourceProvider.GetBasePaths(),
+			segmentFiles,
+			currentQuery,
+		)
+		if err != nil {
+			errCh <- errors.Wrap(err, "failed to inspect secrets")
+		}
 
-	vulnerabilities, err := s.Inspector.Inspect(
-		ctx,
-		scanID,
-		s.files,
-		s.SourceProvider.GetBasePaths(),
-		s.Parser.Platform,
-		currentQuery,
-	)
-	if err != nil {
-		errCh <- errors.Wrap(err, "failed to inspect files")
-	}
-	vulnerabilities = append(vulnerabilities, secretsVulnerabilities...)
+		vulnerabilities, err := s.Inspector.Inspect(
+			ctx,
+			scanID,
+			segmentFiles,
+			s.SourceProvider.GetBasePaths(),
+			s.Parser.Platform,
+			currentQuery,
+		)
+		if err != nil {
+			errCh <- errors.Wrap(err, "failed to inspect files")
+		}
+		vulnerabilities = append(vulnerabilities, secretsVulnerabilities...)
 
-	updateMaskedSecrets(&vulnerabilities, s.SecretsInspector.SecretTracker)
+		updateMaskedSecrets(&vulnerabilities, s.SecretsInspector.SecretTracker)
 
-	err = s.Storage.SaveVulnerabilities(ctx, vulnerabilities)
-	if err != nil {
-		errCh <- errors.Wrap(err, "failed to save vulnerabilities")
+		err = s.Storage.SaveVulnerabilities(ctx, vulnerabilities, contextSelector)
+		if err != nil {
+			errCh <- errors.Wrap(err, "failed to save vulnerabilities")
+		}
 	}
+}
+
+func (s *Service) segmentationPerContextSeletor() map[string]model.FileMetadatas {
+	segments := make(map[string]model.FileMetadatas)
+	for _, file := range s.files {
+		if file.ContextSelector == "" {
+			segments[defaultSelector] = append(segments[defaultSelector], file)
+		} else {
+			segments[file.ContextSelector] = append(segments[file.ContextSelector], file)
+		}
+	}
+	return segments
 }
 
 // Content keeps the content of the file and the number of lines

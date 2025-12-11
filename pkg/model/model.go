@@ -134,6 +134,7 @@ type FileMetadata struct {
 	ResolvedFiles     map[string]ResolvedFile
 	LinesOriginalData *[]string
 	IsMinified        bool
+	ContextSelector   string
 }
 
 // QueryMetadata is a representation of general information about a query
@@ -184,6 +185,7 @@ type Vulnerability struct {
 	CloudProvider    string      `json:"cloud_provider"`
 	Remediation      string      `db:"remediation" json:"remediation"`
 	RemediationType  string      `db:"remediation_type" json:"remediation_type"`
+	ContextSelector  string      `db:"context_selector" json:"contextSelector"`
 }
 
 // QueryConfig is a struct that contains the fileKind and platform of the rego query
@@ -200,11 +202,12 @@ type ResolvedFiles struct {
 
 // ResolvedHelm keeps the information of a file/template resolved
 type ResolvedHelm struct {
-	FileName     string
-	Content      []byte
-	OriginalData []byte
-	SplitID      string
-	IDInfo       map[int]interface{}
+	FileName        string
+	Content         []byte
+	OriginalData    []byte
+	SplitID         string
+	IDInfo          map[int]interface{}
+	ContextSelector string
 }
 
 // Extensions represents a list of supported extensions

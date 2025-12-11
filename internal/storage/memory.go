@@ -31,9 +31,12 @@ func (m *MemoryStorage) GetFiles(_ context.Context, _ string) (model.FileMetadat
 }
 
 // SaveVulnerabilities adds a list of vulnerabilities to vulnerabilities collection
-func (m *MemoryStorage) SaveVulnerabilities(_ context.Context, vulnerabilities []model.Vulnerability) error {
+func (m *MemoryStorage) SaveVulnerabilities(_ context.Context, vulnerabilities []model.Vulnerability, contextSelector string) error {
 	defer memoryMu.Unlock()
 	memoryMu.Lock()
+	for i := range vulnerabilities {
+		vulnerabilities[i].ContextSelector = contextSelector
+	}
 	m.vulnerabilities = append(m.vulnerabilities, vulnerabilities...)
 	return nil
 }
@@ -46,13 +49,14 @@ func (m *MemoryStorage) GetVulnerabilities(_ context.Context, _ string) ([]model
 func (m *MemoryStorage) getUniqueVulnerabilities() []model.Vulnerability {
 	vulnDictionary := make(map[string]model.Vulnerability)
 	for i := range m.vulnerabilities {
-		key := fmt.Sprintf("%s:%s:%d:%s:%s:%s",
+		key := fmt.Sprintf("%s:%s:%d:%s:%s:%s:%s",
 			m.vulnerabilities[i].QueryID,
 			m.vulnerabilities[i].FileName,
 			m.vulnerabilities[i].Line,
 			m.vulnerabilities[i].SimilarityID,
 			m.vulnerabilities[i].SearchKey,
 			m.vulnerabilities[i].KeyActualValue,
+			m.vulnerabilities[i].ContextSelector,
 		)
 		vulnDictionary[key] = m.vulnerabilities[i]
 	}
