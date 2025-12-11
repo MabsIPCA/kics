@@ -130,10 +130,10 @@ func addID(file *chart.File) *chart.File {
 }
 
 // getExcluded will return all files rendered to be excluded from scan
-func getExcluded(charterino *chart.Chart, chartpath string) []string {
+func getExcluded(chartData *chart.Chart, chartPath string) []string {
 	excluded := make([]string, 0)
-	for _, file := range charterino.Raw {
-		excluded = append(excluded, filepath.Join(chartpath, file.Name))
+	for _, file := range chartData.Raw {
+		excluded = append(excluded, filepath.Join(chartPath, file.Name))
 	}
 
 	return excluded
