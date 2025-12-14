@@ -286,6 +286,7 @@ func (c *Client) createService(
 				Tracker:          t,
 				Resolver:         combinedResolver,
 				MaxFileSize:      c.ScanParams.MaxFileSizeFlag,
+				Files:            make(map[string]model.FileMetadatas),
 			},
 		)
 	}

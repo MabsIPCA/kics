@@ -99,8 +99,8 @@ func StartScan(ctx context.Context, scanID string,
 func (s serviceSlice) GetQueriesLength() int {
 	count := 0
 	for _, service := range s {
-		count += service.Inspector.LenQueriesByPlat(service.Parser.Platform)
-		count += service.SecretsInspector.GetQueriesLength()
+		count += service.Inspector.LenQueriesByPlat(service.Parser.Platform) * len(service.Files)
+		count += service.SecretsInspector.GetQueriesLength() * len(service.Files)
 	}
 	return count
 }

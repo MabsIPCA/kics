@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Checkmarx/kics/v2/pkg/kics"
 	"github.com/Checkmarx/kics/v2/pkg/utils"
 
 	consoleFlags "github.com/Checkmarx/kics/v2/internal/console/flags"
@@ -203,7 +204,7 @@ func printFiles(query *model.QueryResult, printer *Printer) {
 }
 
 func prepareContextSelector(selector string) string {
-	if selector == "" {
+	if selector == "" || selector == kics.DefaultSelector {
 		return ""
 	}
 	return fmt.Sprintf(" - (Execution context: %s)", selector)

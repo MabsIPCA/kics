@@ -22,7 +22,7 @@ import (
 
 const (
 	mbConst         = 1048576
-	defaultSelector = "no_selector"
+	DefaultSelector = "no_selector"
 )
 
 // Storage is the interface that wraps following basic methods: SaveFile, SaveVulnerability, GetVulnerability and GetScanSummary
@@ -59,7 +59,7 @@ type Service struct {
 	SecretsInspector *secrets.Inspector
 	Tracker          Tracker
 	Resolver         *resolver.Resolver
-	files            model.FileMetadatas
+	Files            map[string]model.FileMetadatas
 	MaxFileSize      int
 }
 
@@ -96,8 +96,7 @@ func (s *Service) StartScan(
 	log.Debug().Msg("service.StartScan()")
 	defer wg.Done()
 
-	segments := s.segmentationPerContextSeletor()
-	for contextSelector, segmentFiles := range segments {
+	for contextSelector, segmentFiles := range s.Files {
 		secretsVulnerabilities, err := s.SecretsInspector.Inspect(
 			ctx,
 			s.SourceProvider.GetBasePaths(),
@@ -128,18 +127,6 @@ func (s *Service) StartScan(
 			errCh <- errors.Wrap(err, "failed to save vulnerabilities")
 		}
 	}
-}
-
-func (s *Service) segmentationPerContextSeletor() map[string]model.FileMetadatas {
-	segments := make(map[string]model.FileMetadatas)
-	for _, file := range s.files {
-		if file.ContextSelector == "" {
-			segments[defaultSelector] = append(segments[defaultSelector], file)
-		} else {
-			segments[file.ContextSelector] = append(segments[file.ContextSelector], file)
-		}
-	}
-	return segments
 }
 
 // Content keeps the content of the file and the number of lines
@@ -198,7 +185,11 @@ func (s *Service) GetScanSummary(ctx context.Context, scanIDs []string) ([]model
 func (s *Service) saveToFile(ctx context.Context, file *model.FileMetadata) {
 	err := s.Storage.SaveFile(ctx, file)
 	if err == nil {
-		s.files = append(s.files, *file)
+		if (*file).ContextSelector == "" {
+			s.Files[DefaultSelector] = append(s.Files[DefaultSelector], *file)
+		} else {
+			s.Files[(*file).ContextSelector] = append(s.Files[(*file).ContextSelector], *file)
+		}
 	}
 }
 
