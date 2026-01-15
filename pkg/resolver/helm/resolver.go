@@ -28,7 +28,8 @@ type splitManifest struct {
 }
 
 const (
-	kicsHelmID = "# KICS_HELM_ID_"
+	kicsHelmID      = "# KICS_HELM_ID_"
+	maxCombinations = 128
 )
 
 // Resolve will render the passed helm chart and return its content ready for parsing
@@ -104,9 +105,14 @@ func renderHelm(path string, experimentalRendering bool) (map[string]*[]splitMan
 	if experimentalRendering {
 		otherValuesFiles := getOtherValuesFiles(path)
 		if len(otherValuesFiles) > 0 {
-			for _, file := range otherValuesFiles {
+			// Generate all possible combinations of values files
+			combinations := generateCombinations(otherValuesFiles)
+			for _, combo := range combinations {
+				if len(combo) == 0 {
+					continue // skip empty combination, already handled by default values.yaml
+				}
 				expManifest, expExcluded, err := runInstall([]string{path}, client, &values.Options{
-					ValueFiles: []string{file},
+					ValueFiles: combo,
 				})
 				for _, v := range expExcluded {
 					excludedMap[v] = []string{}
@@ -118,9 +124,9 @@ func renderHelm(path string, experimentalRendering bool) (map[string]*[]splitMan
 				if err != nil {
 					return nil, []string{}, err
 				}
-				// get only the filename from the path
-				_, fileName := filepath.Split(file)
-				splitManifests[fileName] = expSplit
+				// create a key from all filenames in the combination
+				comboKey := generateComboKey(combo)
+				splitManifests[comboKey] = expSplit
 			}
 		}
 	}
@@ -148,6 +154,47 @@ func getOtherValuesFiles(path string) []string {
 	}
 
 	return otherValuesFiles
+}
+
+// generateCombinations generates all possible combinations (power set) of the input slice
+func generateCombinations(files []string) [][]string {
+	var result [][]string
+	n := len(files)
+
+	// Total number of combinations is 2^n (excluding empty set)
+	totalCombinations := 1 << n // equivalent to 2^n
+
+	// Limit the number of combinations to avoid excessive processing
+	if totalCombinations > maxCombinations {
+		totalCombinations = maxCombinations
+	}
+
+	// Iterate through all possible combinations (skip 0 to exclude empty set)
+	for combinationMask := 1; combinationMask < totalCombinations; combinationMask++ {
+		var combo []string
+
+		// Check each file's position in the current combination
+		for fileIndex := 0; fileIndex < n; fileIndex++ {
+			fileBit := 1 << fileIndex
+			isFileIncluded := combinationMask&fileBit != 0
+
+			if isFileIncluded {
+				combo = append(combo, files[fileIndex])
+			}
+		}
+		result = append(result, combo)
+	}
+	return result
+}
+
+// generateComboKey creates a unique key from a combination of values files
+func generateComboKey(combo []string) string {
+	var fileNames []string
+	for _, file := range combo {
+		_, fileName := filepath.Split(file)
+		fileNames = append(fileNames, fileName)
+	}
+	return strings.Join(fileNames, "+")
 }
 
 // splitManifestYAML will split the rendered file and return its content by template as well as the template path
@@ -184,17 +231,6 @@ func splitManifestYAML(template *release.Release) (*[]splitManifest, error) {
 			splitID:    lineID,
 			splitIDMap: idMap,
 		})
-
-		// TODO: perceber como consigo usar caminhos fictícios para os diferentes values files
-		// ex: chart/values-dev.yaml, chart/values-prod.yaml
-		// assim consigo distinguir os ficheiros no resultado final
-		// e depois consigo agregar os resultados por ficheiro
-
-		// Notas: como devo gerir como o KICS faz scan de todos os possiveis values?
-		// durante o scan pode dar problemas usar o mesmo contexto
-		// devia gerir is por fora do scan? criar uma ‘flag’ para dar o nome dos values files e depois dar centralizar os resultados
-		// criar infra interna ao KICS para isolar contexto na execução dos scan de helm charts para este caso
-
 	}
 	return &manifests, nil
 }
