@@ -65,6 +65,12 @@
     "defaultValue": "false",
     "usage": "include experimental queries (queries not yet thoroughly reviewed)"
   },
+  "experimental-helm-scan": {
+    "flagType": "bool",
+    "shorthandFlag": "",
+    "defaultValue": "false",
+    "usage": "render unrenderable helm charts by injecting placeholder values (a chart that still fails is skipped); may surface findings on injected values"
+  },
   "fail-on": {
     "flagType": "multiStr",
     "shorthandFlag": "",

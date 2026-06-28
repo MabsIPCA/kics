@@ -22,6 +22,7 @@ type Parameters struct {
 	ExcludeResults              []string
 	ExcludeSeverities           []string
 	ExperimentalQueries         bool
+	ExperimentalHelmScan        bool
 	IncludeQueries              []string
 	InputData                   string
 	OutputName                  string

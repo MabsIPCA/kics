@@ -118,6 +118,7 @@ func getScanParameters(changedDefaultQueryPath, changedDefaultLibrariesPath bool
 		ExcludeResults:              flags.GetMultiStrFlag(flags.ExcludeResultsFlag),
 		ExcludeSeverities:           flags.GetMultiStrFlag(flags.ExcludeSeveritiesFlag),
 		ExperimentalQueries:         flags.GetBoolFlag(flags.ExperimentalQueriesFlag),
+		ExperimentalHelmScan:        flags.GetBoolFlag(flags.ExperimentalHelmScan),
 		IncludeQueries:              flags.GetMultiStrFlag(flags.IncludeQueriesFlag),
 		InputData:                   flags.GetStrFlag(flags.InputDataFlag),
 		OutputName:                  flags.GetStrFlag(flags.OutputNameFlag),

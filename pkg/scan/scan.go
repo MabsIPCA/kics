@@ -266,7 +266,7 @@ func (c *Client) createService(
 
 	// combinedResolver to be used to resolve files and templates
 	combinedResolver, err := resolver.NewBuilder().
-		Add(&helm.Resolver{}).
+		Add(&helm.Resolver{ExperimentalHelmScan: c.ScanParams.ExperimentalHelmScan}).
 		Build()
 	if err != nil {
 		return nil, err

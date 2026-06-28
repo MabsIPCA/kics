@@ -16,6 +16,11 @@ import (
 
 // Resolver is an instance of the helm resolver
 type Resolver struct {
+	// ExperimentalHelmScan enables the helm fixer: when a chart fails to render,
+	// placeholder values are injected and the render is retried so the chart can
+	// still be scanned (see renderWithFixer). Off by default — when disabled the
+	// resolver keeps its fail-closed behavior (an unrenderable chart is skipped).
+	ExperimentalHelmScan bool
 }
 
 // splitManifest keeps the information of the manifest split by source
@@ -41,7 +46,7 @@ func (r *Resolver) Resolve(filePath string) (model.ResolvedFiles, error) {
 			masterUtils.HandlePanic(r, errMessage)
 		}
 	}()
-	splitRenderedManifests, excluded, err := renderHelm(filePath, true)
+	splitRenderedManifests, excluded, err := renderHelm(filePath, r.ExperimentalHelmScan)
 	if err != nil { // return error to be logged
 		return model.ResolvedFiles{}, errors.New("failed to render helm chart")
 	}
@@ -84,12 +89,16 @@ func (r *Resolver) SupportedTypes() []model.FileKind {
 	return []model.FileKind{model.KindHELM}
 }
 
-// renderHelm will use helm library to render helm charts
-func renderHelm(path string, experimentalRendering bool) (map[string]*[]splitManifest, []string, error) {
+// renderHelm will use helm library to render helm charts. experimentalHelmScan
+// enables the experimental helm scan (--experimental-helm-scan): it renders the
+// chart against every combination of the additional values files found alongside
+// values.yaml, and on a render failure it injects placeholder values and retries
+// so the chart can still be scanned.
+func renderHelm(path string, experimentalHelmScan bool) (map[string]*[]splitManifest, []string, error) {
 	splitManifests := map[string]*[]splitManifest{}
 	excludedMap := map[string][]string{}
 	client := newClient()
-	manifest, excluded, err := runInstall([]string{path}, client, &values.Options{})
+	manifest, excluded, err := runInstall([]string{path}, client, &values.Options{}, experimentalHelmScan)
 	for _, v := range excluded {
 		excludedMap[v] = []string{}
 	}
@@ -102,7 +111,7 @@ func renderHelm(path string, experimentalRendering bool) (map[string]*[]splitMan
 	if err != nil {
 		return nil, []string{}, err
 	}
-	if experimentalRendering {
+	if experimentalHelmScan {
 		otherValuesFiles := getOtherValuesFiles(path)
 		if len(otherValuesFiles) > 0 {
 			// Generate all possible combinations of values files
@@ -113,7 +122,7 @@ func renderHelm(path string, experimentalRendering bool) (map[string]*[]splitMan
 				}
 				expManifest, expExcluded, err := runInstall([]string{path}, client, &values.Options{
 					ValueFiles: combo,
-				})
+				}, experimentalHelmScan)
 				for _, v := range expExcluded {
 					excludedMap[v] = []string{}
 				}

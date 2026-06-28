@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	zlog "github.com/rs/zerolog/log"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -26,7 +27,7 @@ var (
 )
 
 func runInstall(args []string, client *action.Install,
-	valueOpts *values.Options) (*release.Release, []string, error) {
+	valueOpts *values.Options, fixRender bool) (*release.Release, []string, error) {
 	log.SetOutput(io.Discard)
 	defer log.SetOutput(os.Stderr)
 	if client.Version == "" && client.Devel {
@@ -45,10 +46,6 @@ func runInstall(args []string, client *action.Install,
 	}
 
 	p := getter.All(settings)
-	vals, err := valueOpts.MergeValues(p)
-	if err != nil {
-		return nil, []string{}, err
-	}
 
 	// Check chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)
@@ -65,11 +62,114 @@ func runInstall(args []string, client *action.Install,
 	}
 
 	client.Namespace = "kics-namespace"
-	helmRelease, err := client.Run(chartRequested, vals)
+	helmRelease, err := renderWithFixer(client, chartRequested, valueOpts, p, fixRender)
 	if err != nil {
 		return nil, []string{}, err
 	}
 	return helmRelease, excluded, nil
+}
+
+// renderWithFixer renders the chart with client.Run. When fixRender is false it
+// behaves exactly as before: a single render, returning any error untouched.
+//
+// When fixRender is true it engages the helm fixer loop: on a render error it
+// classifies the failure (see parseError) and injects a placeholder value
+// (--set) or a kubeVersion override, then re-renders, looping up to
+// maxFixIterations. The loop stops early when an error repeats (no progress),
+// when the error is unfixable by value injection, or when it is a documented
+// non-fixable class (malformed YAML, a nil-pointer on a Helm built-in, or
+// missing dependencies — which KICS resolves separately). On any stop the
+// ORIGINAL render error is returned, preserving today's fail-closed behavior.
+func renderWithFixer(client *action.Install, chartRequested *chart.Chart,
+	valueOpts *values.Options, providers getter.Providers, fixRender bool) (*release.Release, error) {
+	patch := map[string]string{}
+	seenErrs := map[string]bool{}
+
+	for attempt := 1; attempt <= maxFixIterations; attempt++ {
+		vals, err := mergeValuesWithPatch(valueOpts, patch, providers)
+		if err != nil {
+			// The values themselves (a -f file or a prior --set) do not parse;
+			// no further --set injection can repair that.
+			return nil, err
+		}
+
+		helmRelease, runErr := client.Run(chartRequested, vals)
+		if runErr == nil {
+			if attempt > 1 {
+				zlog.Debug().Str("chart", chartRequested.Name()).Int("attempts", attempt).
+					Msg("helm fixer: render resolved after value injection")
+			}
+			return helmRelease, nil
+		}
+
+		// Without the fixer, preserve the original single-render behavior.
+		if !fixRender {
+			return nil, runErr
+		}
+
+		errStr := runErr.Error()
+
+		// Repeated identical error => the last injection made no progress. Stop.
+		if seenErrs[errStr] {
+			return nil, runErr
+		}
+		seenErrs[errStr] = true
+
+		// Documented non-fixable classes: no value injection can help, so log and
+		// stop rather than spin. (Kept explicit per the fixer design.)
+		switch {
+		case isUnparseableYAML(errStr):
+			zlog.Debug().Str("chart", chartRequested.Name()).
+				Msg("helm fixer: skipping non-fixable malformed YAML")
+			return nil, runErr
+		case isUnsupportedBuiltin(errStr):
+			zlog.Debug().Str("chart", chartRequested.Name()).
+				Msg("helm fixer: skipping non-fixable nil pointer on helm built-in")
+			return nil, runErr
+		case isMissingDependency(errStr):
+			zlog.Debug().Str("chart", chartRequested.Name()).
+				Msg("helm fixer: skipping missing-dependency error (resolved separately by KICS)")
+			return nil, runErr
+		}
+
+		kind, path, value, ok := parseError(errStr)
+		if !ok {
+			return nil, runErr
+		}
+
+		if kind == kindKubeVersion {
+			// kubeVersion is a render-wide override, not a --set value.
+			if kv, kvErr := chartutil.ParseKubeVersion(value); kvErr == nil {
+				client.KubeVersion = kv
+			}
+			continue
+		}
+		patch[path] = value
+	}
+
+	return nil, errors.Errorf("helm fixer: exhausted %d fix iterations", maxFixIterations)
+}
+
+// mergeValuesWithPatch merges the chart's configured value options together with
+// the fixer's accumulated --set patch (path=value) overrides.
+func mergeValuesWithPatch(valueOpts *values.Options, patch map[string]string,
+	providers getter.Providers) (map[string]interface{}, error) {
+	if len(patch) == 0 {
+		return valueOpts.MergeValues(providers)
+	}
+	extra := make([]string, 0, len(patch))
+	for k, v := range patch {
+		extra = append(extra, fmt.Sprintf("%s=%s", k, v))
+	}
+	merged := &values.Options{
+		ValueFiles:    valueOpts.ValueFiles,
+		Values:        append(append([]string{}, valueOpts.Values...), extra...),
+		StringValues:  valueOpts.StringValues,
+		FileValues:    valueOpts.FileValues,
+		JSONValues:    valueOpts.JSONValues,
+		LiteralValues: valueOpts.LiteralValues,
+	}
+	return merged.MergeValues(providers)
 }
 
 // checkIfInstallable validates if a chart can be installed
