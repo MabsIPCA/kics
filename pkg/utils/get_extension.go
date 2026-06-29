@@ -16,7 +16,15 @@ import (
 func GetExtension(path string) (string, error) {
 	targets := []string{"Dockerfile", "tfvars"}
 
-	// Get file information
+	// If the path already has an explicit extension, return it without hitting
+	// the filesystem. This handles virtual (in-memory) paths such as resolved
+	// Helm template manifests that do not exist on disk.
+	if ext := filepath.Ext(path); ext != "" {
+		return ext, nil
+	}
+
+	// No extension — need filesystem access to detect content-based types
+	// (Dockerfile, tfvars, possibleDockerfile).
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return "", fmt.Errorf("file %s not found", path)
@@ -26,28 +34,23 @@ func GetExtension(path string) (string, error) {
 		return "", fmt.Errorf("the path %s is a directory", path)
 	}
 
-	ext := filepath.Ext(path)
-	if ext == "" {
-		base := filepath.Base(path)
+	base := filepath.Base(path)
+	if Contains(base, targets) {
+		return base, nil
+	}
 
-		if Contains(base, targets) {
-			ext = base
-		} else {
-			isText, err := isTextFile(path)
+	isText, err := isTextFile(path)
+	if err != nil {
+		return "", err
+	}
 
-			if err != nil {
-				return "", err
-			}
-
-			if isText {
-				if readPossibleDockerFile(path) {
-					ext = "possibleDockerfile"
-				}
-			}
+	if isText {
+		if readPossibleDockerFile(path) {
+			return "possibleDockerfile", nil
 		}
 	}
 
-	return ext, nil
+	return "", nil
 }
 
 func readPossibleDockerFile(path string) bool {

@@ -34,6 +34,15 @@ func mustWrite(t *testing.T, path, content string) {
 	}
 }
 
+// Piped-form type mismatch: `{{ .Values.val | trimPrefix "http://" }}` puts the
+// string literal in at<>, not the .Values. path — unfixable, no --set target visible.
+func TestParseError_WrongTypePipedForm(t *testing.T) {
+	errStr := `Error: template: mychart/templates/cm.yaml:5:30: executing "mychart/templates/cm.yaml" at <"http://">: wrong type for value; expected string; got map[string]interface {}`
+	if _, _, _, ok := parseError(errStr); ok {
+		t.Fatal("expected unfixable (piped form hides .Values. path), got parseable")
+	}
+}
+
 func TestFixerRecoversRequiredValue(t *testing.T) {
 	dir := writeChart(t)
 
