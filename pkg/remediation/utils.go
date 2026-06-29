@@ -15,6 +15,7 @@ import (
 type Summary struct {
 	SelectedRemediationNumber   int
 	ActualRemediationDoneNumber int
+	RemediatedFiles             []string
 }
 
 // GetRemediationSets collects all the replacements and additions per file
@@ -80,7 +81,7 @@ func willRemediate(
 	}
 
 	// scan the temporary file to verify if the remediation removed the result
-	results, err := scanTmpFile(tmpFile, remediation.QueryID, content, openAPIResolveReferences, maxResolverDepth)
+	results, err := scanTmpFile(tmpFile, remediation.QueryID, content, openAPIResolveReferences, maxResolverDepth, remediation.Experimental)
 
 	if err != nil {
 		log.Error().Msgf("failed to get results of query %s: %s", remediation.QueryID, err)
@@ -159,7 +160,6 @@ func (s *Summary) GetRemediationSetsFromVulns(vulnerabilities []model.Vulnerabil
 		}
 
 		var remediationSet Set
-
 		if shouldRemediate(&file, include) {
 			s.SelectedRemediationNumber++
 			r := &Remediation{
@@ -170,6 +170,7 @@ func (s *Summary) GetRemediationSetsFromVulns(vulnerabilities []model.Vulnerabil
 				SearchKey:     vuln.SearchKey,
 				ExpectedValue: vuln.KeyExpectedValue,
 				ActualValue:   vuln.KeyActualValue,
+				Experimental:  vuln.Experimental,
 			}
 
 			if file.RemediationType == "replacement" {
@@ -213,6 +214,7 @@ func getVulns(results Report) []model.Vulnerability {
 				SearchKey:        file.SearchKey,
 				KeyExpectedValue: file.ExpectedValue,
 				KeyActualValue:   file.ActualValue,
+				Experimental:     query.Experimental,
 			}
 
 			vulns = append(vulns, *vuln)

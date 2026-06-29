@@ -7,8 +7,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Checkmarx/kics/v2/pkg/model"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+
+	"github.com/Checkmarx/kics/v2/pkg/model"
 )
 
 // TestParser_GetKind tests the functions [GetKind()] and all the methods called by them
@@ -204,29 +206,63 @@ resources:
 		},
 		{
 			want: `[
-			{
+		  {
+			"_kics_lines": {
+			  "_kics__default": {
+				"_kics_line": 0
+			  },
+			  "_kics_test": {
+				"_kics_arr": [
+				  {
+					"_kics__default": {
+					  "_kics_line": 4
+					},
+					"_kics_group": {
+					  "_kics_line": 4
+					}
+				  }
+				],
+				"_kics_line": 2
+			  },
+			  "_kics_test_2": {
+				"_kics_line": 7
+			  }
+			},
+			"test": [
+			  {
+				"group": {
+				  "_kics_lines": {
+					"_kics__default": {
+					  "_kics_line": 4
+					},
+					"_kics_name": {
+					  "_kics_line": 6
+					}
+				  },
+				  "name": "cx"
+				}
+			  }
+			],
+			"test_2": {
 			  "_kics_lines": {
 				"_kics__default": {
-				  "_kics_line": 0
+				  "_kics_line": 7
 				},
-				"_kics_test": {
+				"_kics_perm": {
 				  "_kics_arr": [
 					{
 					  "_kics__default": {
-						"_kics_line": 4
+						"_kics_line": 9
 					  },
 					  "_kics_group": {
 						"_kics_line": 4
 					  }
 					}
 				  ],
-				  "_kics_line": 2
-				},
-				"_kics_test_2": {
-				  "_kics_line": 7
+				  "_kics_line": 8
 				}
 			  },
-			  "test": [
+			  "perm": [
 				{
 				  "group": {
 					"_kics_lines": {
@@ -240,49 +276,10 @@ resources:
 					"name": "cx"
 				  }
 				}
-			  ],
-			  "test_2": {
-				"_kics_lines": {
-				  "_kics__default": {
-					"_kics_line": 7
-				  },
-				  "_kics_perm": {
-					"_kics_arr": [
-					  {
-						"_kics_<<": {
-						  "_kics_line": 9
-						},
-						"_kics__default": {
-						  "_kics_line": 9
-						}
-					  }
-					],
-					"_kics_line": 8
-				  }
-				},
-				"perm": [
-					{
-						"_kics_lines": {
-							"_kics__default": {
-								"_kics_line": 9
-							}
-						},
-						"group": {
-							"_kics_lines": {
-								"_kics__default": {
-									"_kics_line": 4
-								},
-								"_kics_name": {
-									"_kics_line": 6
-								}
-							},
-							"name": "cx"
-						}
-					}
-				]
-			  }
+			  ]
 			}
-		  ]
+		  }
+		]
 		  `,
 			wantErr:           false,
 			wantLinesToIgnore: []int{5, 6},
@@ -404,6 +401,7 @@ func TestYaml_processElements(t *testing.T) {
 		args     args
 		wantCert map[string]interface{}
 		wantSwag string
+		wantErr  bool
 	}{
 		{
 			name: "test_process_elements",
@@ -420,14 +418,32 @@ func TestYaml_processElements(t *testing.T) {
 				"rsa_key_bytes":   512,
 			},
 			wantSwag: "test",
+			wantErr:  false,
+		},
+		{
+			name: "test_process_elements not string",
+			args: args{
+				elements: map[string]interface{}{
+					"certificate": map[string]interface{}{
+						"swagger_file": "test",
+						"certificate":  filepath.Join("..", "..", "..", "test", "fixtures", "test_certificate", "certificate.pem"),
+					},
+				},
+				filePath: filepath.Join("..", "..", "..", "test", "fixtures", "test_certificate", "certificate.pem"),
+			},
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			processElements(tt.args.elements, tt.args.filePath)
-			require.Equal(t, tt.wantCert, tt.args.elements["certificate"])
-			require.Equal(t, tt.wantSwag, tt.args.elements["swagger_file"])
+			if tt.wantErr {
+				require.Error(t, errors.New("Failed to parse certificate: ..\\..\\..\\test\\fixtures\\test_certificate\\certificate.pem"))
+			} else {
+				require.Equal(t, tt.wantCert, tt.args.elements["certificate"])
+				require.Equal(t, tt.wantSwag, tt.args.elements["swagger_file"])
+			}
 		})
 	}
 }

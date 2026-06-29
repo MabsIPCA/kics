@@ -21,6 +21,7 @@ hide:
 -   **Severity:** <span style="color:#bb2124">High</span>
 -   **Category:** Secret Management
 -   **CWE:** <a href="https://cwe.mitre.org/data/definitions/798.html" onclick="newWindowOpenerSafe(event, 'https://cwe.mitre.org/data/definitions/798.html')">798</a>
+-   **Risk score:** <span style="color:#bb2124">7.8</span>
 -   **URL:** [Github](https://github.com/Checkmarx/kics/tree/master/assets/queries/common/passwords_and_secrets)
 
 ### Description
@@ -1526,6 +1527,139 @@ tags: []
 </details>
 <details><summary>Positive test num. 47 - dockerfile file</summary>
 
+```dockerfile hl_lines="4"
+FROM baseImage
+
+ENV ARTEMIS_USER artemis
+ENV ARTEMIS_PASSWORD artemis
+
+RUN apk add --no-cache git \
+    && git config \
+    --global \
+    url."https://${GIT_USER}:${GIT_TOKEN}@github.com".insteadOf \
+    "https://github.com"
+
+```
+</details>
+<details><summary>Positive test num. 48 - dockerfile file</summary>
+
+```dockerfile hl_lines="4"
+FROM baseImage
+
+ENV ARTEMIS_USER=artemis
+ENV ARTEMIS_PASSWORD=artemis
+
+RUN apk add --no-cache git \
+    && git config \
+    --global \
+    url."https://${GIT_USER}:${GIT_TOKEN}@github.com".insteadOf \
+    "https://github.com"
+
+```
+</details>
+<details><summary>Positive test num. 49 - json file</summary>
+
+```json hl_lines="54"
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "siteName": {
+      "type": "string"
+    },
+    "administratorLogin": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    }
+  },
+  "variables": {
+    "databaseName": "[concat(parameters('siteName'), 'db')]",
+    "serverName": "[concat(parameters('siteName'), 'srv')]",
+    "hostingPlanName": "[concat(parameters('siteName'), 'plan')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2020-06-01",
+      "name": "[variables('hostingPlanName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "Tier": "Standard",
+        "Name": "S1"
+      },
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('siteName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[variables('hostingPlanName')]"
+      },
+      "resources": [
+        {
+          "type": "config",
+          "apiVersion": "2020-06-01",
+          "name": "connectionstrings",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+          ],
+          "properties": {
+            "defaultConnection": {
+              "value": "[concat('Database=', variables('databaseName'), ';Data Source=', reference(resourceId('Microsoft.DBforMySQL/servers', variables('serverName'))).fullyQualifiedDomainName, ';User Id=', parameters('administratorLogin'), '@', variables('serverName'), ';Password=HardCodedP@ssw0rd!')]",
+              "type": "MySql"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
+```
+</details>
+<details><summary>Positive test num. 50 - tf file</summary>
+
+```tf hl_lines="8 14"
+
+variable "linux_vms" {
+  description = "positive54.tf"
+  type = map(object({
+    region                           = string
+    size                             = optional(string)
+    admin_username                   = optional(string)
+    admin_password                   = "optional(sensitive(string))"
+  }))
+  default = {}
+}
+
+resource "azurerm_linux_virtual_machine" "vms" {
+  admin_password        = try(each.value.admin_password, "exposed_password", null)
+}
+```
+</details>
+<details><summary>Positive test num. 51 - json file</summary>
+
+```json hl_lines="4"
+{
+  "Resources": {
+    "service-3": {
+      "secretValue": "secretVaule1"
+    }
+  }
+}
+
+```
+</details>
+<details><summary>Positive test num. 52 - dockerfile file</summary>
+
 ```dockerfile hl_lines="3 7"
 FROM baseImage
 
@@ -1537,7 +1671,7 @@ ARG password=pass!1213Fs
 
 ```
 </details>
-<details><summary>Positive test num. 48 - tf file</summary>
+<details><summary>Positive test num. 53 - tf file</summary>
 
 ```tf hl_lines="8"
 resource "google_container_cluster" "primary2" {
@@ -1562,7 +1696,7 @@ resource "google_container_cluster" "primary2" {
 
 ```
 </details>
-<details><summary>Positive test num. 49 - json file</summary>
+<details><summary>Positive test num. 54 - json file</summary>
 
 ```json hl_lines="4 7"
 {
@@ -1578,7 +1712,7 @@ resource "google_container_cluster" "primary2" {
 
 ```
 </details>
-<details><summary>Positive test num. 50 - tf file</summary>
+<details><summary>Positive test num. 55 - tf file</summary>
 
 ```tf hl_lines="8"
 resource "google_container_cluster" "primary4" {
@@ -2794,11 +2928,402 @@ data "template_file" "sci_integration_app_properties_secret_template" {
 ```dockerfile
 FROM baseImage
 
+ENV ARTEMIS_USER artemis
+
+RUN apk add --no-cache git \
+    && git config \
+    --global \
+    url."https://${GIT_USER}:${GIT_TOKEN}@github.com".insteadOf \
+    "https://github.com"
+
+
+```
+</details>
+<details><summary>Negative test num. 45 - dockerfile file</summary>
+
+```dockerfile
+FROM baseImage
+
 RUN command
 
 ```
 </details>
-<details><summary>Negative test num. 45 - json file</summary>
+<details><summary>Negative test num. 46 - dockerfile file</summary>
+
+```dockerfile
+FROM baseImage
+
+ENV ARTEMIS_USER=artemis
+
+RUN apk add --no-cache git \
+    && git config \
+    --global \
+    url."https://${GIT_USER}:${GIT_TOKEN}@github.com".insteadOf \
+    "https://github.com"
+
+
+```
+</details>
+<details><summary>Negative test num. 47 - yml file</summary>
+
+```yml
+stages:
+- template: templates/main-stage.yml
+  parameters:
+    environment:                      'foo'
+    isSm9ChangeRequired:              true
+  
+    isDedicatedSubscription:          'true'
+    setResourceLock:                  'true'
+    nameResourceLock:                 'PrdPreventAccidentalDeletion'
+    isDevelopment:                    'false'
+    # example 1 (placeholders)
+    vmAdminPassword:                  '$(VM_ADMIN_PASSWORD)'                 # SET IN PIPELINE
+    sqlAdminPassword:                 '$(SQL_ADMIN_PASSWORD)'                # SET IN PIPELINE
+    yetanotherAdminPassword:          '${{SQL_ADMIN_PASSWORD}}'                # SET IN PIPELINE
+    andyetanotherAdminPassword:       '${{ SQL_ADMIN_PASSWORD }}'                # SET IN PIPELINE
+
+    # example 2 (empty string value)
+    anotherAdminPassword:             ''                 # SET IN PIPELINE
+
+    serviceConnectionName:            'foo' 
+    subscriptionId:                   'foo'
+    organisationalGroup:              'foo'        # Replace this with your own Organisational Group name.
+    devOrganisationalGroup:           'foo'                                     # should be empty for none DEV env
+    sm9ApplicationCi:                 'foo'                                  # Replace this with your own SM9 Application CI name.
+    resourceGroupBaseName:            'foo'                 # This is used to construct a Resource Group name. Replace this with your desired resource group name.
+    resourceGroupNameSuffix:          'foo'                                    # This is suffixed to the Resource Group name in a Shared subscription (must be an integer). Can be left as-is.
+    location:                         'foo'                           # Replace this with your desired Azure region.
+    linuxAgentPoolName:               'foo'                # Agent pool name of Linux agents. Can be left as-is.
+    windowsAgentPoolName:             'foo'              # Agent pool name of Windows agents. Can be left as-is.
+    System.Debug:                     'foo'                                 # Set to 'foo' to enable debug logging. Can be left as-is.
+
+    skipAdditionalResources:          'foo'                                # if true skip creating additional resources
+    skipSQL:                          'foo'
+
+    #####################################################################################
+    # ADF                                                                               #
+    #####################################################################################
+    adfName:                          'foo'
+    adfDeveloperGroup:                'foo'        # Group has access to ADF
+    irName:                           'foo'
+    irDescription:                    'foo'
+
+
+
+```
+</details>
+<details><summary>Negative test num. 48 - yml file</summary>
+
+```yml
+version: '3.7'
+
+services:
+  apis:
+    image: ""
+    env_file:
+      - .env
+    environment:
+      env: "dev"
+
+      # this value is a Docker Compose secrets path, its contents are not exposed
+      PrivateKey: /run/secrets/SOME_AUTHORIZATION_PRIVATE_KEY
+
+secrets:
+  SOME_AUTHORIZATION_PRIVATE_KEY:
+    external: true
+
+
+```
+</details>
+<details><summary>Negative test num. 49 - json file</summary>
+
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "siteName": {
+      "type": "string"
+    },
+    "administratorLogin": {
+      "type": "string"
+    },
+    "administratorLoginPassword": {
+      "type": "securestring"
+    },
+    "secretSuffix": {
+      "type": "string",
+      "defaultValue": "word"
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    }
+  },
+  "variables": {
+    "databaseName": "[concat(parameters('siteName'), 'db')]",
+    "serverName": "[concat(parameters('siteName'), 'srv')]",
+    "hostingPlanName": "[concat(parameters('siteName'), 'plan')]",
+    "passKey": "[concat('Pass', parameters('secretSuffix'))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2020-06-01",
+      "type": "Microsoft.Web/serverfarms",
+      "name": "[variables('hostingPlanName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "Tier": "Standard",
+        "Name": "S1"
+      },
+      "properties": {}
+    },
+    {
+      "apiVersion": "2020-06-01",
+      "type": "Microsoft.Web/sites",
+      "name": "[parameters('siteName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[variables('hostingPlanName')]"
+      },
+      "resources": [
+        {
+          "apiVersion": "2020-06-01",
+          "type": "config",
+          "name": "connectionstrings",
+          "properties": {
+            "defaultConnection": {
+              "value": "[concat('Database=', variables('databaseName'), ';Data Source=', reference(resourceId('Microsoft.DBforMySQL/servers',variables('serverName'))).fullyQualifiedDomainName, ';User Id=', parameters('administratorLogin'),'@', variables('serverName'),';Password=', parameters('administratorLoginPassword'))]",
+              "type": "MySql"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+</details>
+<details><summary>Negative test num. 50 - json file</summary>
+
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "apiSecret": {
+      "type": "secureString"
+    }
+  },
+  "variables": {
+    "connectionSecret": "[parameters('apiSecret')]"
+  },
+  "resources": []
+}
+```
+</details>
+<details><summary>Negative test num. 51 - yml file</summary>
+
+```yml
+jobs:
+  release:
+    if: github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on:
+      group: Prod
+      labels: helm
+    permissions:
+       contents: write # for publishing release
+       actions: write # for createWorkflowDispatch
+       issues: write # for comments on issues
+       pull-requests: write # for comments on pull requests
+       #id-token: write # for oidc npm provenance
+       #"id-token": read 
+       #'id-token': none
+       #permissions: {id-token: write, contents: read, pull-requests: write} 
+    steps:
+      - name: debug
+        shell: bash
+        run: |
+          echo 'github.event_actor=${{ github.event_actor }}'
+```
+</details>
+<details><summary>Negative test num. 52 - tf file</summary>
+
+```tf
+
+variable "linux_vms" {
+  description = "A list of the Linux VMs to create.  \n <a name=region:></a>[region:](#region:) The Azure location where the Windows Virtual Machine should exist. Changing this forces a new resource to be created.  \n <a name=size:></a>[size:](#size:) The SKU which should be used for this Virtual Machine, such as Standard_F2.  \n <a name=admin_username:></a>[admin_username:](#admin_username:) The username of the local administrator used for the Virtual Machine. Changing this forces a new resource to be created.  \n <a name=admin_password:></a>[admin_password:](#admin_password:) he Password which should be used for the local-administrator on this Virtual Machine. Changing this forces a new resource to be created."
+  type = map(object({
+    region                           = string
+    size                             = optional(string)
+    admin_username                   = optional(string)
+    admin_password                   = optional(string)
+  }))
+  default = {}
+}
+
+resource "azurerm_linux_virtual_machine" "vms" {
+  admin_password        = try(each.value.admin_password, null)
+}
+```
+</details>
+<details><summary>Negative test num. 53 - bicep file</summary>
+
+```bicep
+import { common, tagsObject, deployName, removeSpace } from '../../../CommonValues.bicep'
+
+@description('Nome do sistema')
+param systemName string
+
+@description('Nome do recurso')
+param resourceName string = removeSpace(systemName)
+
+@description('Enterprise Tagging object')
+param tags tagsObject
+
+resource kvTest 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: 'kv-test-sample'
+  scope: resourceGroup('rg-test-sample')
+}
+
+module consumerModule '../SecretConsumer/Resource.bicep' = {
+  name: deployName(resourceName, 'Test.SecretConsumer', tags.lastReleaseId)
+  params: {
+    systemName: systemName
+    resourceName: resourceName
+    tags: tags
+    apiClientSecret: kvTest.getSecret('secret-sample') 
+  }
+}
+
+```
+</details>
+<details><summary>Negative test num. 54 - json file</summary>
+
+```json
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "[parameters('apiVersion')]",
+            "name": "[parameters('logicAppName')]",
+            "location": "centralus",
+            "properties": {},
+            "actions": {
+                "Sample_action_1": {
+                    "runAfter_164": {
+                        "HTTP_-_Get_OAuth_Token": [
+                            "Succeeded"
+                        ]
+                    }
+                },
+                "Sample_action_2": {
+                    "runAfter_192": {
+                        "Parse_JSON_-_OAuth_Token": [
+                            "Succeeded"
+                        ]
+                    }
+                },
+                "Sample_action_3": {
+                    "runAfter_240": {
+                        "Try_-_Get_OAuth_Token": [
+                            "TimedOut",
+                            "Failed"
+                        ]
+                    }
+                },
+                "Sample_action_4": {
+                    "runAfter_678": {
+                        "Catch_-_Get_OAuth_Token": [
+                            "Skipped"
+                        ]
+                    }
+                }
+            }
+        }
+    ]
+}
+```
+</details>
+<details><summary>Negative test num. 55 - bicep file</summary>
+
+```bicep
+param systemName string
+param resourceName string
+param tags object
+param originUrl string
+
+module myModule '../AnotherModule/Resource.bicep' = {
+  name: '${resourceName}-MyModule'
+  params: {
+    systemName: systemName
+    resourceName: resourceName
+    tags: tags
+    apiUrl: originUrl
+  }
+}
+
+module clientModule '../ClientModule/Resource.bicep' = {
+  name: '${resourceName}-ClientModule'
+  params: {
+    systemName: systemName
+    resourceName: resourceName
+    tags: tags
+    validationToken: myModule.outputs.apiToken 
+  }
+}
+
+// Saída do módulo
+output clientUrl string = clientModule.outputs.clientUrl
+output clientName string = clientModule.outputs.clientName
+
+```
+</details>
+<details><summary>Negative test num. 56 - tf file</summary>
+
+```tf
+resource "aws_secretsmanager_secret_version" "secret_version" {
+  for_each = { for k, v in var.clients.scram : k => v if var.enabled && var.client_sasl_scram_enabled }
+
+  secret_id     = aws_secretsmanager_secret.client_secret[each.key].id                                                                                              # use of indexes
+  secret_string = jsonencode({ "username" : join("_", [var.product, each.key, var.environment == "dev" ? var.environment : var.stack]), "password" : random_password.client_password[each.key].result })
+}
+
+resource "aws_secretsmanager_secret_version" "secret_version_2" {
+  for_each = { for k, v in var.clients.scram : k => v if var.enabled && var.client_sasl_scram_enabled }
+
+  secret_id     = aws_secretsmanager_secret.client_secret[each.key].id                                                                                              # use of indexes
+  secret_string = jsonencode({ "username" : join("_", [var.product, each.key, var.environment == "dev" ? var.environment : var.stack]), "password" : random_password[each.key].client_password.result })
+}
+
+resource "aws_secretsmanager_secret_version" "secret_version_3" {
+  for_each = { for k, v in var.clients.scram : k => v if var.enabled && var.client_sasl_scram_enabled }
+
+  secret_id     = aws_secretsmanager_secret.client_secret[each.key].id                                                                                              # use of indexes
+  secret_string = jsonencode({ "username" : join("_", [var.product, each.key, var.environment == "dev" ? var.environment : var.stack]), "password" : random_password["index"].client_password.result })
+}
+
+resource "aws_msk_scram_secret_association" "msk_secret_association" {
+  count           = var.enabled && var.client_sasl_scram_enabled ? 1 : 0
+  cluster_arn     = aws_msk_cluster.kafka[0].arn
+  secret_arn_list = [for secret in aws_secretsmanager_secret.client_secret : secret.arn] # short reference
+}
+
+resource "aws_msk_scram_secret_association" "msk_secret_association_2" {
+  count           = var.enabled && var.client_sasl_scram_enabled ? 1 : 0
+  cluster_arn     = aws_msk_cluster.kafka[0].arn
+  secret_arn_list = [for secret in aws_secretsmanager_secret.client_secret : null] # short reference
+}
+
+```
+</details>
+<details><summary>Negative test num. 57 - json file</summary>
 
 ```json
 {
@@ -2818,7 +3343,7 @@ RUN command
 
 ```
 </details>
-<details><summary>Negative test num. 46 - tf file</summary>
+<details><summary>Negative test num. 58 - tf file</summary>
 
 ```tf
 resource "google_container_cluster" "primary3" {
@@ -2843,7 +3368,7 @@ resource "google_container_cluster" "primary3" {
 
 ```
 </details>
-<details><summary>Negative test num. 47 - tf file</summary>
+<details><summary>Negative test num. 59 - tf file</summary>
 
 ```tf
 resource "google_container_cluster" "primary5" {
@@ -2868,7 +3393,7 @@ resource "google_container_cluster" "primary5" {
 
 ```
 </details>
-<details><summary>Negative test num. 48 - tf file</summary>
+<details><summary>Negative test num. 60 - tf file</summary>
 
 ```tf
 resource "google_secret_manager_secret" "secret-basic" {
@@ -2885,3 +3410,4 @@ resource "google_secret_manager_secret" "secret-basic" {
 
 ```
 </details>
+

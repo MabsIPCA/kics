@@ -21,6 +21,7 @@ hide:
 -   **Severity:** <span style="color:#ff7213">Medium</span>
 -   **Category:** Supply-Chain
 -   **CWE:** <a href="https://cwe.mitre.org/data/definitions/1357.html" onclick="newWindowOpenerSafe(event, 'https://cwe.mitre.org/data/definitions/1357.html')">1357</a>
+-   **Risk score:** <span style="color:#ff7213">6.4</span>
 -   **URL:** [Github](https://github.com/Checkmarx/kics/tree/master/assets/queries/dockerfile/image_version_not_explicit)
 
 ### Description
@@ -50,6 +51,38 @@ RUN echo "build"
 FROM construction AS final
 RUN echo "final"
 ```
+```dockerfile title="Positive test num. 3 - dockerfile file" hl_lines="4 7"
+FROM ubuntu:22.04 AS test
+RUN echo "hello"
+
+FROM positive4 
+RUN echo "positive4"
+
+FROM positive42
+RUN echo "positive42"
+```
+<details><summary>Positive test num. 4 - dockerfile file</summary>
+
+```dockerfile hl_lines="10 7"
+FROM ubuntu:22.04 AS test1
+RUN echo "depth"
+
+FROM test1 AS test2
+RUN echo "depth"
+
+FROM test_fail_1
+RUN echo "depth"
+
+FROM test3 AS test_fail_2
+RUN echo "depth"
+
+FROM test2 AS test3
+RUN echo "depth"
+
+FROM test3 AS test_fail_1
+RUN echo "depth"
+```
+</details>
 
 
 #### Code samples without security vulnerabilities
@@ -77,3 +110,31 @@ RUN echo "build"
 FROM build AS final
 RUN echo "final"
 ```
+```dockerfile title="Negative test num. 3 - dockerfile file"
+FROM ubuntu@sha256:b59d21599a2b151e23eea5f6602f4af4d7d31c4e236d22bf0b62b86d2e386b8f as base
+RUN echo "base"
+
+FROM base
+RUN echo "stage1"
+
+```
+<details><summary>Negative test num. 4 - dockerfile file</summary>
+
+```dockerfile
+FROM ubuntu:22.04 AS test1
+RUN echo "depth1"
+
+FROM test1 AS test2
+RUN echo "depth2"
+
+FROM test2 AS test3
+RUN echo "depth3"
+
+FROM test3 AS test4
+RUN echo "depth4"
+
+FROM test4 
+RUN echo "depth5"
+```
+</details>
+
