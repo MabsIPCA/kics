@@ -158,6 +158,10 @@ func checkExpectedOutput(t *testing.T, tt *testcases.TestCase, argIndex int) {
 	if utils.Contains(resultsFormats, "json-bom") {
 		utils.JSONSchemaValidationFromFile(t, jsonFileName, "resultBoM.json")
 	}
+	// Check Docker image BoM file (--image-bom, fixed filename)
+	if utils.Contains(resultsFormats, "image-bom") {
+		utils.JSONSchemaValidationFromFile(t, "kics-image-bom.json", "result-image-bom.json")
+	}
 	// Check result file (JSON including CIS Descriptions)
 	if utils.Contains(resultsFormats, "json-cis") {
 		utils.JSONSchemaValidationFromFile(t, jsonFileName, "resultCIS.json")
