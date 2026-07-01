@@ -44,6 +44,7 @@ type Parameters struct {
 	ChangedDefaultLibrariesPath bool
 	ScanID                      string
 	BillOfMaterials             bool
+	ImageBOM                    bool
 	ExcludeGitIgnore            bool
 	OpenAPIResolveReferences    bool
 	ParallelScanFlag            int

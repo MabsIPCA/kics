@@ -59,6 +59,12 @@
     "defaultValue": "false",
     "usage": "include bill of materials (BoM) in results output"
   },
+  "image-bom": {
+    "flagType": "bool",
+    "shorthandFlag": "",
+    "defaultValue": "false",
+    "usage": "export a CycloneDX bill of materials (kics-image-bom.json) of the Docker images found in the scan"
+  },
   "experimental-queries": {
     "flagType": "bool",
     "shorthandFlag": "",

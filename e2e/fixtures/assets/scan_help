@@ -37,6 +37,7 @@ Flags:
       --ignore-on-exit string         defines which kind of non-zero exits code should be ignored
                                       accepts: all, results, errors, none
                                       example: if 'results' is set, only engine errors will make KICS exit code different from 0 (default "none")
+      --image-bom                     export a CycloneDX bill of materials (kics-image-bom.json) of the Docker images found in the scan
   -i, --include-queries strings       include queries by providing the query ID
                                       cannot be provided with query exclusion flags
                                       can be provided multiple times or as a comma separated string

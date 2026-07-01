@@ -13,6 +13,7 @@ const (
 	ExcludeSeveritiesFlag   = "exclude-severities"
 	ExperimentalQueriesFlag = "experimental-queries"
 	ExperimentalHelmScan    = "experimental-helm-scan"
+	ImageBomFlag            = "image-bom"
 	IncludeQueriesFlag      = "include-queries"
 	InputDataFlag           = "input-data"
 	FailOnFlag              = "fail-on"
